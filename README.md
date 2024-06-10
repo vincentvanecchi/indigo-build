@@ -5,7 +5,8 @@
 C++20 modules build system written from scratch.
 Supports C and C++ translation units. <br>
 **Meant** to be used in indie projects for fun. <br>
-**Not meant** to revolutionize the world of C/C++ build systems.
+**Not meant** to revolutionize the world of C/C++ build systems. <br>
+You can build this repository by simply `py __init__.py build`.
 
 ## Requirements
 
