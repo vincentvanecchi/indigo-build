@@ -3,14 +3,14 @@ from dataclasses import dataclass, field
 from typing import Optional
 from argparse import ArgumentParser, Namespace
 
-from build_system.filesystem import PathLike, \
+from indigo.filesystem import PathLike, \
     join, path_exists, \
     create_directory, remove_directory, \
     clean_directory, list_directory, \
     relative_directory, current_directory, \
-    is_modified_after, get_dot_path
+    is_modified_after, get_dot_path, get_file_name, get_file_extension
 
-from build_system.options import Options
+from indigo.options import Options
 
 class CompilationError(RuntimeError):
     pass
@@ -46,8 +46,6 @@ class Project(ABC):
         assert self.source_directory
         assert self.build_directory
 
-        if not self.root_directory:
-            self.root_directory = current_directory()
 
         if not path_exists(self.build_directory):
             create_directory(self.build_directory)
@@ -58,10 +56,13 @@ class Project(ABC):
         if not path_exists(self.cache_directory):
             create_directory(self.cache_directory)
 
-        _tests_directory_candidate = join(self.source_directory, 'test')
-        if not self.tests_directory and path_exists(_tests_directory_candidate):
-            self.tests_directory = _tests_directory_candidate
+        if not self.tests_directory:
+            _tests_directory_candidate = join(self.root_directory if self.root_directory else self.source_directory, 'test')
+            if path_exists(_tests_directory_candidate):
+                self.tests_directory = _tests_directory_candidate
 
+        if not self.root_directory:
+            self.root_directory = current_directory()
 
     @property
     def executable_path(self) -> PathLike:
@@ -96,6 +97,9 @@ class Project(ABC):
 
     def _on_test_finish(self, test: PathLike, code: int):
         pass 
+
+    def _on_config(self):
+        pass
 
     def add_dependencies(self, *projects: 'Project'):
         for project in projects:
@@ -303,7 +307,8 @@ class Project(ABC):
             'build', 
             'rebuild', 
             'clean', 
-            'test'
+            'test',
+            'config'
         ])
 
         return parser
@@ -318,6 +323,57 @@ class Project(ABC):
                 self.clean()
             case 'test': 
                 self.test()
+            case 'config':
+                from indigo.basic_shell import cts_header, cts_okcyan, cts_okgreen, \
+                    cts_underline, cts_warning, cts_bold, cts_fail
+                cts_pass = lambda x: f"'{x}'"
+
+                cts_header_sqbr = lambda x: f'  {"[" + cts_warning(x) + "]"}'
+                cts_key_value = lambda k, v: f'    {cts_okgreen(k):<30} = \'{v}\''
+
+                print(f':{cts_header("project")}: {cts_okcyan(self.name)}> configuration')
+                print(cts_header_sqbr('directories'))
+                for dir in ("root directory", "source directory", "tests directory", "build directory", "cache directory"):
+                    print(cts_key_value(dir, getattr(self, dir.replace(' ', '_'))))
+
+                print(cts_header_sqbr('sources'))
+                main_file = None
+                for source_file in self.source_files:
+                    if get_file_name(source_file) in ('main.cpp', 'main.c'):
+                        assert not main_file, "can't have two main translation units in a single project"
+                        main_file = source_file
+                    else:
+                        source_type = None
+                        match get_file_extension(source_file):
+                            case '.hxx':
+                                source_type = 'header unit'
+                            case '.ixx':
+                                source_type = 'module interface'
+                            case '.cxx':
+                                source_type = 'module implementation'
+                            case '.c':
+                                source_type = 'C translation unit'
+                            case '.cpp':
+                                source_type = 'CXX translation unit'
+                            case '.uxx':
+                                source_type = 'unit test'
+                            case _:
+                                source_type = 'external'
+
+                        print(cts_key_value(source_type, source_file))
+                
+                if main_file:
+                    print(cts_key_value('main', main_file))
+                
+                print(cts_header_sqbr('output'))
+                if self.options.enable_debug_information:
+                    print(cts_key_value('debug information', self.debug_information_path))
+                print(cts_key_value('static library', self.static_library_path))
+                if main_file:
+                    print(cts_key_value('executable', self.executable_path))
+
+                self._on_config()
+                print()
             case _:
                 raise ValueError(f'unsupported build target \"{args.target}\"')
             

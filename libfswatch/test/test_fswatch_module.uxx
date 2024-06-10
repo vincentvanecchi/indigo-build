@@ -85,6 +85,9 @@ int main(int ac, char** av) {
 
         svc.reset();
 
+        std::cerr << "Don't mind me, I am just testing if this is captured." << std::endl;
+        std::cerr << "I'm serious. Don't even bother, Bruh." << std::endl;
+
         try {
             svc.rethrow();
         } catch (const std::exception& e) {

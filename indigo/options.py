@@ -1,7 +1,7 @@
 from enum import IntEnum
 from dataclasses import dataclass, field
 
-from build_system.filesystem import PathLike, path_exists, get_dot_path
+from indigo.filesystem import PathLike, path_exists, get_dot_path
 
 class WarningLevel(IntEnum):
     Basic = 1

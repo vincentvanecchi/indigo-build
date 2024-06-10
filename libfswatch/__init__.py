@@ -1,52 +1,43 @@
-import msvc
+from indigo import fs, Project
 
-def build_project(target: str) -> msvc.Project:
-    root_directory = msvc._Path_Dir(__file__)
+PROJECT_NAME = 'libfswatch'
+PROJECT_DIRECTORY = fs.get_parent_directory(__file__)
+PROJECT_DEPENDENCIES = []
+PROJECT_SOURCES = [
+    'libfswatch/c/windows/realpath.c',
+    'libfswatch/c/cevent.cpp',
+    'libfswatch/c/libfswatch_log.cpp',
+    'libfswatch/c/libfswatch.cpp',
+    'libfswatch/c++/windows/win_strings.cpp',
+    'libfswatch/c++/windows/win_paths.cpp',
+    'libfswatch/c++/windows/win_error_message.cpp',
+    'libfswatch/c++/windows/win_handle.cpp',
+    'libfswatch/c++/windows/win_directory_change_event.cpp',
+    'libfswatch/c++/string/string_utils.cpp',
+    'libfswatch/c++/libfswatch_exception.cpp',
+    'libfswatch/c++/event.cpp',
+    'libfswatch/c++/filter.cpp',
+    'libfswatch/c++/path_utils.cpp',
+    'libfswatch/c++/windows_monitor.cpp',
+    'libfswatch/c++/monitor.cpp',
+    'libfswatch/c++/monitor_factory.cpp',
 
-    fswatch = msvc.Project(
-        name = 'fswatch',
-        type = msvc.ProjectType.LIB,
-        config = msvc.Config(msvc.ConfigType.Debug),
-        source_directory = msvc._Path_Join(root_directory, 'src'),
-        build_directory = msvc._Path_Join(root_directory, '.build'),
-        tests_directory = msvc._Path_Join(root_directory, 'test')
-    )
-    fswatch.config.cflags[2] = msvc._CFlag.W2 # TODO: ?
+    'fswatch.ixx',
+    'fswatch.cxx'
+]
 
-    if target == 'test':
-        fswatch.test()
-        exit(0)
-
-    if target != 'build':
-        fswatch.clean()
+def configure_project(*dependencies: Project, build_directory: fs.PathLike = None) -> Project:
+    assert not dependencies
     
-    fswatch.build([
-        'libfswatch/c/windows/realpath.c',
-        'libfswatch/c/cevent.cpp',
-        'libfswatch/c/libfswatch_log.cpp',
-        'libfswatch/c/libfswatch.cpp',
-        'libfswatch/c++/windows/win_strings.cpp',
-        'libfswatch/c++/windows/win_paths.cpp',
-        'libfswatch/c++/windows/win_error_message.cpp',
-        'libfswatch/c++/windows/win_handle.cpp',
-        'libfswatch/c++/windows/win_directory_change_event.cpp',
-        'libfswatch/c++/string/string_utils.cpp',
-        'libfswatch/c++/libfswatch_exception.cpp',
-        'libfswatch/c++/event.cpp',
-        'libfswatch/c++/filter.cpp',
-        'libfswatch/c++/path_utils.cpp',
-        'libfswatch/c++/windows_monitor.cpp',
-        'libfswatch/c++/monitor.cpp',
-        'libfswatch/c++/monitor_factory.cpp',
+    project = Project(
+        name = PROJECT_NAME, 
+        root_directory = PROJECT_DIRECTORY,
+        source_directory = fs.join(PROJECT_DIRECTORY, 'src'),
+        build_directory = fs.join(build_directory, PROJECT_NAME) if build_directory else fs.join(PROJECT_DIRECTORY, '.build'),
+        source_files = PROJECT_SOURCES
+    )
 
-        'fswatch.ixx',
-        'fswatch.cxx'
-    ])
+    project.options.warning_level = 2
+    project.options.treat_warnings_as_errors = False
 
-    return fswatch
-
-__all__ = ['build_project']
-
-if __name__ == '__main__':
-    target = msvc._Parse_Target()
-    build_project(target)
+    return project

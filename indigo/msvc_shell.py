@@ -2,9 +2,9 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Callable
 
-from build_system.filesystem import PathLike, remove_file, get_file_name, get_file_line
+from indigo.filesystem import PathLike, remove_file, get_file_name, get_file_line
 
-from build_system.basic_shell import \
+from indigo.basic_shell import \
     cts_bold, cts_fail, cts_header, \
     cts_warning, cts_underline, cts_okcyan, \
     cts_okblue, cts_okgreen, cts_break, \
@@ -182,12 +182,13 @@ class _Msvc:
 
     def _Exec(self, tool: _Msvc_Tool, args: tuple[str]|str) -> bool:
         try:
+            is_test_job = isinstance(tool, str)
             executable = self._Tool_Path(tool)
 
             if isinstance(args, str):
-                args = [ tool.value if isinstance(tool, _Msvc_Tool) else tool, *(args.split(' ')) ]
+                args = [ tool if is_test_job else tool.value, *(args.split(' ')) ]
             else:
-                args = [ tool.value if isinstance(tool, _Msvc_Tool) else tool, *args ]
+                args = [ tool if is_test_job else tool.value, *args ]
                 
             _, _, returncode = _Shell_Exec(
                 executable=executable, 
@@ -206,6 +207,24 @@ class _Msvc:
             job._Await()
         self._jobs.clear()
 
+    def _Default_Logger(section: str, args: tuple[str]|str = tuple()):
+        return _Msvc._Logger(section, args)
+
+    def _Default_Parser(
+        stdout: str,
+        stderr: str,
+        returncode: int
+    ) -> tuple[str, str, int]:
+        for line in stdout.splitlines():
+            print(f'  :{cts_okgreen("out")}> {line}')
+
+        for line in stderr.splitlines():
+            print(f'  :{cts_fail("err")}> {line}')
+
+        print(f'  :{cts_okblue("int")}> {returncode}')
+
+        return stdout, stderr, returncode
+
     def _Exec_Async(self, name: str, tool: _Msvc_Tool, args: tuple[str]|str, callback: Callable[[], bool] = None) -> bool:
         while len(self._jobs) >= self._max_jobs:
             job: _Msvc_Job = self._jobs.pop(0)
@@ -213,14 +232,21 @@ class _Msvc:
                 self._Fail_Fast()
                 return False
 
+        is_build_job = isinstance(tool, _Msvc_Tool)
         if isinstance(args, str):
-            args = [ tool.value if isinstance(tool, _Msvc_Tool) else tool, *(args.split(' ')) ]
+            args = [ tool.value if is_build_job else tool, *(args.split(' ')) ]
         else:
-            args = [ tool.value if isinstance(tool, _Msvc_Tool) else tool, *args ]
+            args = [ tool.value if is_build_job else tool, *args ]
 
         try:
             executable = self._Tool_Path(tool)
-            cmd = _Shell_Exec_Async(name, executable, args, _Msvc._Logger, _Msvc._Parser)
+            logger = _Msvc._Default_Logger
+            parser = _Msvc._Default_Parser
+            if is_build_job:
+                logger = _Msvc._Logger
+                parser = _Msvc._Parser
+
+            cmd = _Shell_Exec_Async(name, executable, args, logger, parser)
             self._jobs.append( _Msvc_Job(name, cmd, callback) )
             return True
         except:

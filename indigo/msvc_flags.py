@@ -1,4 +1,4 @@
-from build_system.filesystem import PathLike, get_dot_path, join
+from indigo.filesystem import PathLike, get_dot_path, join
 
 class _CFlag:
     CStandard = '/std:c17'

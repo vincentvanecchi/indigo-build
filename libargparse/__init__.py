@@ -1,33 +1,19 @@
-import msvc
+from indigo import fs, Project
 
-def build_project(target: str) -> msvc.Project:
-    root_directory = msvc._Path_Dir(__file__)
+PROJECT_NAME = 'libargparse'
+PROJECT_DIRECTORY = fs.get_parent_directory(__file__)
+PROJECT_DEPENDENCIES = []
+PROJECT_SOURCES = ['argparse.ixx', 'main.cpp']
 
-    argparse = msvc.Project(
-        name = 'argparse',
-        type = msvc.ProjectType.LIB,
-        config = msvc.Config(msvc.ConfigType.Debug),
-        source_directory = msvc._Path_Join(root_directory, 'src'),
-        build_directory = msvc._Path_Join(root_directory, '.build'),
-        tests_directory = msvc._Path_Join(root_directory, 'test')
-    )
-    argparse.config.cflags[2] = msvc._CFlag.WAll # TODO: ?
-
-    if target == 'test':
-        argparse.test()
-        exit(0)
-
-    if target != 'build':
-        argparse.clean()
+def configure_project(*dependencies: Project, build_directory: fs.PathLike = None) -> Project:
+    assert not dependencies
     
-    argparse.build([
-        'argparse.ixx'
-    ])
-
-    return argparse
-
-__all__ = ['build_project']
-
-if __name__ == '__main__':
-    target = msvc._Parse_Target()
-    build_project(target)
+    project = Project(
+        name = PROJECT_NAME, 
+        root_directory = PROJECT_DIRECTORY,
+        source_directory = fs.join(PROJECT_DIRECTORY, 'src'),
+        build_directory = fs.join(build_directory, PROJECT_NAME) if build_directory else fs.join(PROJECT_DIRECTORY, '.build'),
+        source_files = PROJECT_SOURCES
+    )
+    
+    return project

@@ -3,7 +3,7 @@ import subprocess
 from typing import Callable
 from dataclasses import dataclass, field
 
-from build_system.filesystem import PathLike, get_file_name
+from indigo.filesystem import PathLike, get_file_name
 
 class _Console_Text_Style:
     HEADER = '\033[95m'
@@ -40,7 +40,7 @@ def cts_bold(text: str) -> str:
 def cts_underline(text: str) -> str:
     return _Console_Text_Style.UNDERLINE + text + _Console_Text_Style.ENDC
 
-def cts_break(text: str, style: str = _Console_Text_Style.UNDERLINE) -> str:
+def cts_break(text: str, style: str = _Console_Text_Style.BOLD) -> str:
     return _Console_Text_Style.ENDC + text + style
 
 def _Shell_Exec(

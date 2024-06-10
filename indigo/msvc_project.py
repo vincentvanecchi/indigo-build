@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from typing import Callable
 from functools import cache, cached_property
 
-from build_system.filesystem import *
+from indigo.filesystem import *
 
-from build_system.msvc_flags import \
+from indigo.msvc_flags import \
     _CFlag, _LFlag, _IfcFlag, _Warnings_Mode, _Debug_Mode, \
     build_msvc_compile_flags, \
     build_msvc_lib_flags, \
@@ -19,10 +19,10 @@ from build_system.msvc_flags import \
     dump_msvc_ifc_map, \
     _Module, _Header_Unit, _Translation_Unit
 
-from build_system.msvc_shell import _Msvc, _Msvc_Error, _Msvc_Job, \
+from indigo.msvc_shell import _Msvc, _Msvc_Error, _Msvc_Job, \
     cts_header, cts_warning, cts_fail, cts_underline, cts_okcyan, cts_okgreen, cts_bold
 
-from build_system.project import Project, CompilationError
+from indigo.project import Project, CompilationError
 
 @dataclass
 class _Msvc_Project(Project):
@@ -70,6 +70,11 @@ class _Msvc_Project(Project):
         else:
             print(f':{cts_header("project")}: {cts_okcyan(self.name)} > test {cts_warning(get_file_name(test, strip_ext=True)[len("test_"):])}: {cts_fail("FAILURE")} (exited with code {code})')
 
+    def _on_config(self):
+        cts_pass = lambda x: f"'{x}'"
+        print(f'  {"[" + cts_warning("msvc") + "]"}')
+        print(f'    {cts_okgreen("ifc search directory"):<30} = {cts_pass(self.ifc_search_directory)}')
+        print(f'    {cts_okgreen("ifc map path"):<30} = {cts_pass(self.ifc_map_path)}')
 
     @cached_property
     def ifc_map_path(self) -> PathLike:
