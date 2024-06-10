@@ -1,0 +1,139 @@
+#include <libfswatch/c++/monitor_factory.hpp>
+#include <stdexcept>
+#include <memory>
+#include <thread>
+#include <iostream>
+#include <fstream>
+#include <atomic>
+#include <filesystem>
+#include <format>
+#include <chrono>
+
+#include <windows.h>
+
+#include <cassert>
+
+struct CTRL_C {
+    inline static std::atomic<bool> requested = false;
+    
+    CTRL_C() {
+        BOOL _Ready = SetConsoleCtrlHandler(&_Windows_Console_Ctrl_Handler, TRUE);
+        assert(_Ready);
+    }
+
+    static BOOL WINAPI _Windows_Console_Ctrl_Handler(DWORD fdwCtrlType)
+    {
+        switch (fdwCtrlType)
+        {
+            // Handle the CTRL-C signal.
+        case CTRL_C_EVENT:
+            CTRL_C::requested = true;
+            return TRUE;
+
+        case CTRL_CLOSE_EVENT:
+            return FALSE;
+
+        case CTRL_BREAK_EVENT:
+            CTRL_C::requested = true;
+            return TRUE;
+
+        case CTRL_LOGOFF_EVENT:
+            return FALSE;
+
+        case CTRL_SHUTDOWN_EVENT:
+            return FALSE;
+
+        default:
+            return FALSE;
+        }
+    }
+};
+
+
+void on_fsw_events(const std::vector<fsw::event>& events, void* context) {
+    (void)context;
+
+    std::cout << "on_fsw_events:" << std::endl;
+    char timestamp[256];
+    for (const auto& ev : events) {
+        std::cout << "    path: " << ev.get_path() << std::endl;
+        auto time_point = ev.get_time_point();
+        size_t ms = static_cast<size_t>(std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
+        .count() % 1000);
+        std::cout << "    time: " << std::vformat("{:%Y.%m.%d %X}.{:0>3}", std::make_format_args(time_point, ms)) << std::endl;
+        for (auto flag : ev.get_flags()) {
+            std::cout << "    flag: " << fsw::event::get_event_flag_name(flag) << std::endl;
+        }
+        if (ev.get_correlation_id() != 0) {
+            std::cout << "    correlation_id: " << ev.get_correlation_id() << std::endl;
+        }
+        std::cout << "    -" << std::endl;
+    }
+}
+
+int main(int ac, char** av) {
+    CTRL_C ctrl_c;
+
+    if (!std::filesystem::exists("fswatched")) {
+        std::filesystem::create_directory("fswatched");
+    }
+    else if (!std::filesystem::is_directory("fswatched")) {
+        throw std::runtime_error("path \"./fswatched\" already exists and is not a directory");
+    }
+
+    std::vector<std::string> paths;
+    paths.push_back("fswatched");
+    
+    std::unique_ptr<fsw::monitor> mon{ fsw::monitor_factory::create_monitor(fsw_monitor_type::windows_monitor_type, paths, &on_fsw_events, nullptr) };
+    mon->set_recursive(true);
+    mon->set_latency(0.1);
+
+    std::exception_ptr exc;
+
+    std::jthread fs_([&mon, &exc]() {
+        try {
+            std::this_thread::sleep_for(std::chrono::seconds{1});
+            std::filesystem::create_directories("fswatched/dir");
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            // create file
+            {
+                std::ofstream f("fswatched/dir/file.txt");
+                f << ":)";
+                f.close();
+            } 
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            std::filesystem::copy_file("fswatched/dir/file.txt", "fswatched/dir/filecopy.txt");
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            std::filesystem::rename("fswatched/dir/filecopy.txt", "fswatched/dir/filerename.txt");
+            std::filesystem::rename("fswatched/dir/file.txt", "fswatched/dir/filedel.txt");
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            std::filesystem::remove("fswatched/dir/filedel.txt");
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            std::filesystem::remove_all("fswatched/dir");
+            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        } catch (const std::exception&) {
+            exc = std::current_exception();
+        }
+
+        mon->stop();
+    });
+    
+    mon->start();
+    
+    fs_.join();
+    mon.reset();
+
+    std::error_code ec;
+    std::filesystem::remove_all("fswatched", ec);
+
+    if (exc) {
+        try {
+            std::rethrow_exception(exc);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
+            return 1;
+        }
+    }
+
+    return 0;
+}

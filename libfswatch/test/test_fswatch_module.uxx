@@ -1,0 +1,100 @@
+#include <filesystem>
+#include <thread>
+#include <iostream>
+#include <fstream>
+#include <cassert>
+
+import fswatch;
+
+int main(int ac, char** av) {
+    (void)ac;
+    (void)av;
+    
+    try {
+
+        std::filesystem::create_directory("fswatched");
+        fswatch::Service svc(std::vector<std::string>{"fswatched"}, fswatch::Configuration{ 
+            .latency = std::chrono::milliseconds{100}, 
+            .recursive = true 
+        });
+        
+        std::cout << "MAIN> Starting fswatch service" << std::endl;
+        svc.start();
+        assert(svc.is_running());
+        
+        std::cout << "MAIN> Starting event logger" << std::endl;
+        std::jthread event_logger([&svc](){
+            try {
+                auto svc_stop_token_ = svc.get_stop_token();
+                while (!svc_stop_token_.stop_requested() && svc.is_running()) {
+                    if (svc.wait_events_for(std::chrono::milliseconds{250})) {
+                        std::vector<fswatch::Event> events = svc.pop_events();
+                        
+                        for (auto evt : events) {
+                            std::cout << evt.to_string() << std::endl;
+                        }
+                    }
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR: in event logger thread: " << e.what() << std::endl;
+            }
+        });
+
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Creating fswatched/dir" << std::endl;
+        std::filesystem::create_directories("fswatched/dir");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Creating fswatched/dir/file.txt" << std::endl;
+        // create file
+        {
+            std::ofstream f("fswatched/dir/file.txt");
+            f << ":)";
+            f.close();
+        } 
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Copying fswatched/dir/file.txt -> filecopy.txt" << std::endl;
+        std::filesystem::copy_file("fswatched/dir/file.txt", "fswatched/dir/filecopy.txt");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Renaming fswatched/dir/filecopy.txt -> filerename.txt" << std::endl;
+        std::filesystem::rename("fswatched/dir/filecopy.txt", "fswatched/dir/filerename.txt");
+
+        std::cout << "MAIN> Renaming fswatched/dir/file.txt -> filedel.txt" << std::endl;
+        std::filesystem::rename("fswatched/dir/file.txt", "fswatched/dir/filedel.txt");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Removing fswatched/dir/filedel.txt" << std::endl;
+        std::filesystem::remove("fswatched/dir/filedel.txt");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::cout << "MAIN> Removing fswatched/dir" << std::endl;
+        std::filesystem::remove_all("fswatched/dir");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+
+        std::cout << "MAIN> Stopping service" << std::endl;
+        svc.request_stop();
+        event_logger.join();
+
+        std::cout << "MAIN> Removing fswatched directory" << std::endl;
+        std::error_code ec;
+        std::filesystem::remove_all("fswatched", ec); // ignore errors
+
+        svc.reset();
+
+        try {
+            svc.rethrow();
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: in fswatch service thread: " << e.what() << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR: in main: " << e.what() << std::endl;
+        return 2;
+    }
+
+    return 0;
+}

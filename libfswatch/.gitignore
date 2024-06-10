@@ -1,0 +1,6 @@
+# MSVC
+.vs
+.vscode
+__pycache__
+.build
+fswatched/
