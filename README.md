@@ -21,6 +21,7 @@ Source file types:
 - .ixx :: module interface
 - .cxx :: module implementation
 - ~~.tbdxx~~ :: internal partition ;; Don't feel like it is of any use right now
+- .uxx :: unit test ;; Has to define `int main(int ac, char**)` function.
 - .c :: C translation unit
 - .cpp :: C++ translation unit
 
@@ -74,6 +75,8 @@ indigo:
   - [ ] output validation
   - [ ] --record option to save tests output as ethalon for future validations
   - [ ] feed input to tests
+  - [ ] generate main.obj
+  - [ ] Doctest integration (<https://github.com/doctest/doctest>)
 
 ### Postponed
 
