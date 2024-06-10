@@ -3,9 +3,9 @@
 ## Description
 
 C++20 modules build system written from scratch.
-Supports C and C++ translation units.
-Meant to be used in indie projects for fun.
-**Not** meant to be used by huge corpos or in enterprise projects for eddies.
+Supports C and C++ translation units. <br>
+**Meant** to be used in indie projects for fun. <br>
+**Not meant** to revolutionize the world of C/C++ build systems.
 
 ## Requirements
 
@@ -19,13 +19,13 @@ Source file types:
 - .hxx :: header unit
 - .ixx :: module interface
 - .cxx :: module implementation
-- ~~.tbdxx :: internal partition ~~ ;; Don't feel like it is of any use right now
+- ~~.tbdxx~~ :: internal partition ;; Don't feel like it is of any use right now
 - .c :: C translation unit
 - .cpp :: C++ translation unit
 
-> note:
-> :: Source files `main.c` and `main.cpp` are reserved for `int main(int, char**)` functions.
-> :: Indigo tries to produce an executable if translation unit with such name is discovered.
+> Note: <br>
+> : Source files `main.c` and `main.cpp` are reserved for `int main(int, char**)` functions. <br>
+> : Indigo tries to produce an executable if translation unit with such name is discovered.
 
 ## Motivation
 
@@ -81,5 +81,5 @@ indigo:
 
 ## License
 
-unlicense: <https://unlicense.org>
+unlicense: <https://unlicense.org> <br>
 author: <vincent@newbject.com>
