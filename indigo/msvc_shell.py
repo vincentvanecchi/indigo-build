@@ -4,11 +4,8 @@ from typing import Callable
 
 from indigo.filesystem import PathLike, remove_file, get_file_name, get_file_line
 
-from indigo.basic_shell import \
-    cts_bold, cts_fail, cts_header, \
-    cts_warning, cts_underline, cts_okcyan, \
-    cts_okblue, cts_okgreen, cts_break, \
-    _Shell_Exec, _Shell_Exec_Async, _Async_Command
+from indigo.console_text_styles import *
+from indigo.basic_shell import _Shell_Exec, _Shell_Exec_Async, _Async_Command
 
 
 class _Msvc_Error(RuntimeError):
@@ -33,7 +30,7 @@ class _Msvc_Job:
                     return self.callback(returncode)
                 except AssertionError as e:
                     import traceback
-                    print(f':{cts_header("task")}:> {cts_warning("in task " + self.name + ": caught AssertionError")}')
+                    cts_print_warning(section='task', text=f'in task {self.name}: AssertionError:')
                     traceback.print_tb(e.__traceback__)
                     return False
             else: 
@@ -83,31 +80,19 @@ class _Msvc:
             pass
         return False
 
-    _Logger_Max_Line_Width = 120
     @staticmethod
-    def _Logger(section: str, args: tuple[str]|str = tuple()):
-        assert section
+    def _Default_Logger(section: str, subsection: str, text: str):
+        cts_print(section=section, subsection=subsection, text=text)
 
-        if isinstance(args, str):
-            args = args.split(' ')
-            # return print(f':{cts_underline(get_filename(executable))}> {args}')
-
-        line = f':{cts_header(section)}>'
-        for arg in args:
-            if not isinstance(arg, str):
-                arg = str(arg)
-
-            new_line_length = len(line) + len(arg) + 1
-            
-            if new_line_length < _Msvc._Logger_Max_Line_Width:
-                line += ' '
-                line += arg
-                continue
-            
-            print(line)
-            line = '  ` ' + arg
-        print(line)
-
+    @staticmethod
+    def _Default_Parser(
+        stdout: str,
+        stderr: str,
+        returncode: int
+    ) -> tuple[str, str, int]:
+        cts_print_subprocess((stdout, stderr, returncode))
+        return stdout, stderr, returncode
+    
     @staticmethod
     def _Parser(
         stdout: str,
@@ -119,7 +104,7 @@ class _Msvc:
 
         stdoutlines = stdout.splitlines()
         if len(stdoutlines) > 1 and not stdoutlines[0].startswith('Microsoft (R)'):
-            print('  :>', cts_underline(stdoutlines[0])) # filename
+            cts_print(text=stdoutlines[0], text_style=cts_underline, tab='  ')
         
         errors = list()
         for line in stdoutlines[1:]:
@@ -128,7 +113,7 @@ class _Msvc:
             elif line.startswith('Microsoft (R)') or line.startswith('Copyright (C)'):
                 continue
             elif 'error C' in line or 'error LNK' in line:
-                print('  :>', cts_fail(line))
+                cts_print_error(text=line)
                 _ = line.split(':')
                 __ = _[0].strip()
                 if len(__) < 3:
@@ -136,9 +121,9 @@ class _Msvc:
                     __ = _[1].strip()
                 errors.append(__ if __.endswith(')') else line)
             elif 'warning C' in line or 'warning LNK' in line:
-                print('  :>', cts_warning(line))
+                cts_print_warning(text=line)
             else:
-                print('  :>', line)
+                cts_print_info(text=line)
         
         if errors:
             raise _Msvc_Error(*errors)
@@ -148,19 +133,25 @@ class _Msvc:
     @staticmethod
     def _Error_Summary(err: _Msvc_Error):
         if err.args:
-            print( f':{cts_header("MSVC")}> {cts_bold("error locations summary")}:' )
+            cts_print(section='mvsc', text='error locations summary:')
             # remove duplicates
-            locations = { el for el in err.args }
+            locations = []
+            [ locations.append(l) for l in err.args if l not in locations ]
             # log locations
             for error_location in locations:
                 _ = error_location.split('(')
                 assert len(_) == 2, f'bad error location: {error_location}'
                 filename, line = _
                 line = line[:-1]
-                if line_content := get_file_line(filename, int(line) - 1):
-                    print(f'  :{cts_underline(get_file_name(filename))}:{line}>', line_content)
-                else:
-                    print(f'  :{cts_underline(get_file_name(filename))}:{line}> (file or line was not found)')
+                line_content = get_file_line(filename, int(line) - 1) or 'N/A'
+                cts_print(
+                    section=get_file_name(filename), 
+                    section_style=cts_underline,
+                    subsection=str(line), 
+                    subsection_style=cts_pass,
+                    text=line_content,
+                    tab='  '
+                )
 
     def _Tool_Path(self, tool: _Msvc_Tool) -> PathLike:
         # aight
@@ -182,19 +173,19 @@ class _Msvc:
 
     def _Exec(self, tool: _Msvc_Tool, args: tuple[str]|str) -> bool:
         try:
-            is_test_job = isinstance(tool, str)
+            is_build_job = isinstance(tool, _Msvc_Tool)
             executable = self._Tool_Path(tool)
 
             if isinstance(args, str):
-                args = [ tool if is_test_job else tool.value, *(args.split(' ')) ]
+                args = [ tool.value if is_build_job else tool, *(args.split(' ')) ]
             else:
-                args = [ tool if is_test_job else tool.value, *args ]
+                args = [ tool.value if is_build_job else tool, *args ]
                 
             _, _, returncode = _Shell_Exec(
                 executable=executable, 
                 args=args,
-                logger=_Msvc._Logger, 
-                parser=_Msvc._Parser
+                logger=_Msvc._Default_Logger, 
+                parser=_Msvc._Parser if is_build_job else _Msvc._Default_Parser
             )
             return returncode == 0
         except _Msvc_Error as e:
@@ -206,24 +197,6 @@ class _Msvc:
         for job in self._jobs:
             job._Await()
         self._jobs.clear()
-
-    def _Default_Logger(section: str, args: tuple[str]|str = tuple()):
-        return _Msvc._Logger(section, args)
-
-    def _Default_Parser(
-        stdout: str,
-        stderr: str,
-        returncode: int
-    ) -> tuple[str, str, int]:
-        for line in stdout.splitlines():
-            print(f'  :{cts_okgreen("out")}> {line}')
-
-        for line in stderr.splitlines():
-            print(f'  :{cts_fail("err")}> {line}')
-
-        print(f'  :{cts_okblue("int")}> {returncode}')
-
-        return stdout, stderr, returncode
 
     def _Exec_Async(self, name: str, tool: _Msvc_Tool, args: tuple[str]|str, callback: Callable[[], bool] = None) -> bool:
         while len(self._jobs) >= self._max_jobs:
@@ -243,7 +216,6 @@ class _Msvc:
             logger = _Msvc._Default_Logger
             parser = _Msvc._Default_Parser
             if is_build_job:
-                logger = _Msvc._Logger
                 parser = _Msvc._Parser
 
             cmd = _Shell_Exec_Async(name, executable, args, logger, parser)

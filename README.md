@@ -6,7 +6,7 @@ C++20 modules build system written from scratch.
 Supports C and C++ translation units. <br>
 **Meant** to be used in indie projects for fun. <br>
 **Not meant** to revolutionize the world of C/C++ build systems. <br>
-You can build this repository by simply `py __init__.py build`.
+See [examples](EXAMPLES.md).
 
 ## Requirements
 
@@ -60,9 +60,9 @@ indigo:
 
 ### Work in-progress
 
-- [ ] Solution
-  - [ ] encapsulate multi-project configurations ;; indigo/solution.py
-  - [ ] explicit target project argument to clean/build/rebuild/test commands
+- [x] Solution
+  - [x] encapsulate multi-project configurations ;; indigo/solution.py
+  - [x] explicit target project argument to clean/build/rebuild/test commands
 - [ ] MSVC Project
   - [ ] implement dynamic libraries
 - [ ] Options
@@ -71,6 +71,9 @@ indigo:
 ### Planned
 
 - [ ] tests
+  - [ ] isolated examples to test commands {clean, build and rebuild}
+  - [ ] test Solution and Subproject export/import 
+- [ ] unit tests
   - [ ] input/output schema
   - [ ] output validation
   - [ ] --record option to save tests output as ethalon for future validations

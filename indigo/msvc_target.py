@@ -19,13 +19,12 @@ from indigo.msvc_flags import \
     dump_msvc_ifc_map, \
     _Module, _Header_Unit, _Translation_Unit
 
-from indigo.msvc_shell import _Msvc, _Msvc_Error, _Msvc_Job, \
-    cts_header, cts_warning, cts_fail, cts_underline, cts_okcyan, cts_okgreen, cts_bold
-
-from indigo.project import Project, CompilationError
+from indigo.console_text_styles import *
+from indigo.msvc_shell import _Msvc, _Msvc_Error, _Msvc_Job
+from indigo.target import Target, CompilationError
 
 @dataclass
-class _Msvc_Project(Project):
+class MsvcTarget(Target):
     ifc_search_directory: PathLike = None
     
     _msvc: _Msvc = field(default_factory=_Msvc._Instance)
@@ -33,7 +32,7 @@ class _Msvc_Project(Project):
     _rebuilt_files: int = 0
 
     def __post_init__(self):
-        Project.__post_init__(self)
+        Target.__post_init__(self)
 
         if not self.ifc_search_directory:
             self.ifc_search_directory = join(self.build_directory, 'ifc')
@@ -44,37 +43,48 @@ class _Msvc_Project(Project):
     def _on_clean(self):
         assert self.ifc_search_directory
         clean_directory(self.ifc_search_directory)
-        print(f':{cts_header("project")}: {cts_okcyan(self.name)} > cleaned')
-
+        cts_print(section='project', subsection=self.name, text=f'cleaning :: {cts_okgreen("successful")}')
+        
     def _on_build(self, building: bool):
         if building:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > building ...')
+            cts_print(section='project', subsection=self.name, text=f'building :: {cts_warning("started")}')
         else:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > nothing to build')
+            cts_print(section='project', subsection=self.name, text=f'building :: {cts_underline("skipped")}')
 
     def _on_built(self, elapsed: float):
-        print(f':{cts_header("project")}: {cts_okcyan(self.name)} > {cts_okgreen("built")} in {elapsed:.3f}s')
+        cts_print(section='project', subsection=self.name, text=f'building :: {cts_okgreen("finished")} in {elapsed:.3f}s')
 
     def _on_test(self, running: bool):
         if running:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > testing ...')
+            cts_print(section='project', subsection=self.name, text=f'testing ;;')
         else:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > nothing to test')
+            cts_print(section='project', subsection=self.name, text=f'testing :: {cts_underline("skipped")}')
 
     def _on_test_start(self, test: PathLike):
-        print(f':{cts_header("project")}: {cts_okcyan(self.name)} > test {cts_warning(get_file_name(test, strip_ext=True)[len("test_"):])}')
+        cts_print(
+            section='project',
+            subsection=self.name,
+            text=f'testing :: case {get_file_name(test, strip_ext=True)[len("test_"):]}'
+        )
     
     def _on_test_finish(self, test: PathLike, code: int):
         if code == 0:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > test {cts_warning(get_file_name(test, strip_ext=True)[len("test_"):])}: {cts_okgreen("SUCCESS")} (exited with code {code})')
+            cts_print(
+                section='project',
+                subsection=self.name,
+                text=f'testing :: case {get_file_name(test, strip_ext=True)[len("test_"):]} ;; {cts_okgreen("SUCCESS")}'
+            )
         else:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > test {cts_warning(get_file_name(test, strip_ext=True)[len("test_"):])}: {cts_fail("FAILURE")} (exited with code {code})')
+            cts_print(
+                section='project',
+                subsection=self.name,
+                text=f'testing :: case {get_file_name(test, strip_ext=True)[len("test_"):]} ;; {cts_fail("FAILURE")}'
+            )
 
     def _on_config(self):
-        cts_pass = lambda x: f"'{x}'"
-        print(f'  {"[" + cts_warning("msvc") + "]"}')
-        print(f'    {cts_okgreen("ifc search directory"):<30} = {cts_pass(self.ifc_search_directory)}')
-        print(f'    {cts_okgreen("ifc map path"):<30} = {cts_pass(self.ifc_map_path)}')
+        cts_print_config_category('msvc')
+        for property in ("ifc_search_directory", "ifc_map_path"):
+            cts_print_config_pair(property.replace('_', ' '), getattr(self, property))
 
     @cached_property
     def ifc_map_path(self) -> PathLike:
@@ -92,10 +102,10 @@ class _Msvc_Project(Project):
                 self.module_interfaces, 
                 self.header_units
                 )
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > {cts_okgreen("wrote")} ifc map to {ifc_map}')
+            cts_print(section='project', subsection=self.name, text=f'wrote ifc map to {ifc_map}')
             return ifc_map
         else:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > nothing to write in ifc map')
+            cts_print(section='project', subsection=self.name, text=f'skipping ifc map')
             return None
         
     def resolve_modified_dependencies(self, modified_files: list[PathLike]) -> list[PathLike]:
@@ -166,7 +176,7 @@ class _Msvc_Project(Project):
             # relative_directory(self.source_directory, self.root_directory)
         ))
         
-        for dependency in self.dependencies.values():
+        for dependency in self._subtargets:
             if not path_exists(dependency.static_library_path):
                 dependency.build()
             assert path_exists(dependency.static_library_path)
@@ -176,7 +186,7 @@ class _Msvc_Project(Project):
                 # relative_directory(dependency.source_directory, self.root_directory)
             ))
             
-            if isinstance(dependency, _Msvc_Project) and path_exists(dependency.ifc_map_path):
+            if isinstance(dependency, MsvcTarget) and path_exists(dependency.ifc_map_path):
                 flags.append(_IfcFlag.IfcMap)
                 flags.append(dependency.ifc_map_path)
 
@@ -192,7 +202,7 @@ class _Msvc_Project(Project):
     def _Dependencies_static_libraries(self) -> list[str]:
         libs = []
         
-        for dependency in self.dependencies.values():
+        for dependency in self._subtargets:
             if not path_exists(dependency.static_library_path):
                 dependency.build()
             assert path_exists(dependency.static_library_path)
@@ -374,7 +384,7 @@ class _Msvc_Project(Project):
         args.append(_CFlag.IncludeDirectory(self.source_directory))
         args.append(_CFlag.IncludeDirectory(self.tests_directory))
 
-        for dependency in self.dependencies.values():
+        for dependency in self._subtargets:
             if not path_exists(dependency.static_library_path):
                 dependency.build()
             assert path_exists(dependency.static_library_path)
@@ -384,7 +394,7 @@ class _Msvc_Project(Project):
                 # relative_directory(dependency.source_directory, self.root_directory)
             ))
             
-            if isinstance(dependency, _Msvc_Project) and path_exists(dependency.ifc_map_path):
+            if isinstance(dependency, MsvcTarget) and path_exists(dependency.ifc_map_path):
                 args.append(_IfcFlag.IfcMap)
                 args.append(dependency.ifc_map_path)
         
@@ -434,7 +444,7 @@ class _Msvc_Project(Project):
         self._Await_deferred_commands()
 
         if self.object_files and path_exists(self.static_library_path) and not self._rebuilt_files:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > Not linking static library: no changes since last build.')
+            cts_print(section='project', subsection=self.name, text=f'static library :: no changes since last build')
             return
 
         args = self._Basic_lib_flags()
@@ -449,11 +459,11 @@ class _Msvc_Project(Project):
         self._Await_deferred_commands()
 
         if not self.main_translation_unit:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > Not linking executable: main translation unit was not found')
+            cts_print(section='project', subsection=self.name, text=f'executable :: no main translation unit')
             return
         
         if path_exists(self.executable_path) and not self._rebuilt_files:
-            print(f':{cts_header("project")}: {cts_okcyan(self.name)} > Not linking executable: no changes since last build.')
+            cts_print(section='project', subsection=self.name, text=f'executable :: no changes since last build')
             return
         
         args = self._Basic_exe_flags()

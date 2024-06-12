@@ -10,7 +10,8 @@ def join(*parts: PathLike) -> PathLike:
 
 def get_parent_directory(path: PathLike) -> PathLike:
     """
-        f.e. "a/b/c.ext" => "a/b" ("a\\b" on Windows)
+        Resolves path and strips filename.
+        f.e. "a/b/c.ext" => "/cwd/a/b" ("DRIVE:\\CWD\\a\\b" on Windows)
     """
     return os.path.normpath(os.path.dirname(os.path.realpath(path)))
 

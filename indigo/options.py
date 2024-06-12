@@ -1,9 +1,8 @@
-from enum import IntEnum
 from dataclasses import dataclass, field
 
 from indigo.filesystem import PathLike, path_exists, get_dot_path
 
-class WarningLevel(IntEnum):
+class WarningLevel:
     Basic = 1
     Advanced = 2
     Extra = 3
@@ -15,7 +14,7 @@ class Options:
     enable_rtti: bool = True
     enable_debug_information: bool = True
     disable_optimizations: bool = True
-    warning_level: WarningLevel = WarningLevel.All
+    warning_level: int = WarningLevel.All
     treat_warnings_as_errors: bool = True
 
     # whatever corner cases
@@ -36,17 +35,11 @@ class Options:
             **kwargs
             )
 
+    _Project_Attribute = 'PROJECT_OPTIONS'
     @staticmethod
-    def TryImport(path: PathLike = 'project_options.py') -> 'Options':
-        if path_exists(path):
-            import importlib
-            try:
-                m = importlib.import_module( get_dot_path(path, strip_ext=True) )
-                _BUILD_SYSTEM_OPTIONS_ATTRIBUTE = 'PROJECT_OPTIONS'
-                if hasattr(m, _BUILD_SYSTEM_OPTIONS_ATTRIBUTE):
-                    options = getattr(m, _BUILD_SYSTEM_OPTIONS_ATTRIBUTE)
-                    assert isinstance(options, Options)
-                    return options
-            except ImportError:
-                pass
+    def TryImport(module) -> 'Options':
+        if hasattr(module, Options._Project_Attribute):
+            options = getattr(module, Options._Project_Attribute)
+            assert isinstance(options, Options)
+            return options
         return Options()

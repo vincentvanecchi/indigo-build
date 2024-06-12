@@ -41,6 +41,10 @@ class _CFlag:
     WholeProgramOptimization = '/GL'
 
     @staticmethod
+    def PreincludeFile(file: PathLike):
+        return f'/FI{file}'
+
+    @staticmethod
     def IncludeDirectory(dir: PathLike):
         from os import sep
         assert dir
