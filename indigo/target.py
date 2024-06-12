@@ -44,6 +44,7 @@ class Target(ABC):
 
     _subtargets: list['Target'] = field(default_factory=list, init=False, repr=False, hash=False, compare=False, kw_only=True)
     _is_visited: bool = field(default=False, init=False, repr=False, hash=False, compare=False, kw_only=True)
+    _should_relink: bool = field(default=False, init=False, repr=False, hash=False, compare=False, kw_only=True)
 
     def __post_init__(self):
         assert self.name
@@ -131,8 +132,15 @@ class Target(ABC):
                     modified_files.append(source_file)
         
         modified_files = self.resolve_modified_dependencies(modified_files)
+        
         if not modified_files:
-            return self._on_build(False)
+            for subtarget in self._subtargets:
+                if not subtarget.static_library_path \
+                    or is_modified_after(subtarget.static_library_path, self.static_library_path):
+                    self._should_relink = True
+                    break
+            if not self._should_relink:
+                return self._on_build(False)
         
         self._on_build(True)
 
@@ -303,7 +311,9 @@ class Target(ABC):
         pass
     
     def print_config(self):
-        cts_print(section='project', subsection=self.name, text=f'configuration')
+        #cts_print(section='project', subsection=self.name, text=f'configuration')
+        print()
+        print(f'[{cts_header("project")}: {cts_okcyan(self.name)}]')
         cts_print_config_category('directories')
         for dir in ("root directory", "source directory", "tests directory", "build directory", "cache directory"):
             cts_print_config_pair(dir, getattr(self, dir.replace(' ', '_')))
@@ -345,7 +355,6 @@ class Target(ABC):
             cts_print_config_pair('executable', self.executable_path)
 
         self._on_config()
-        print()
 
     def on_command(self, args: Namespace):
         for subtarget in self._subtargets:

@@ -165,7 +165,7 @@ class Solution:
             else:
                 self._targets[target_name].on_command(args)
 
-        if args.target:
+        if args.target and args.target != 'all':
             target_on_command(args.target)
         else:
             for subproject_name in self.subprojects:

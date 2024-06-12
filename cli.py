@@ -6,6 +6,12 @@ if __name__ == '__main__':
         argument_parser = solution.argument_parser()
         # argument_parser.add_argument('--custom')
         args = argument_parser.parse_args()
+        console_text_styles.cts_print(
+            section='solution', 
+            subsection=solution.name, 
+            text=f'executing :: command: {console_text_styles.cts_warning(args.command)}; ' \
+            + f'target: {console_text_styles.cts_warning(args.target or "all")}'
+        )
         solution.on_command(args)
     except CompilationError:
         console_text_styles.cts_print(

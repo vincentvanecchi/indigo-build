@@ -49,7 +49,7 @@ class MsvcTarget(Target):
         if building:
             cts_print(section='project', subsection=self.name, text=f'building :: {cts_warning("started")}')
         else:
-            cts_print(section='project', subsection=self.name, text=f'building :: {cts_underline("skipped")}')
+            cts_print(section='project', subsection=self.name, text=f'building :: {cts_underline("no changes since last build")}')
 
     def _on_built(self, elapsed: float):
         cts_print(section='project', subsection=self.name, text=f'building :: {cts_okgreen("finished")} in {elapsed:.3f}s')
@@ -58,7 +58,7 @@ class MsvcTarget(Target):
         if running:
             cts_print(section='project', subsection=self.name, text=f'testing ;;')
         else:
-            cts_print(section='project', subsection=self.name, text=f'testing :: {cts_underline("skipped")}')
+            cts_print(section='project', subsection=self.name, text=f'testing :: {cts_underline("no changes since last build")}')
 
     def _on_test_start(self, test: PathLike):
         cts_print(
@@ -105,7 +105,7 @@ class MsvcTarget(Target):
             cts_print(section='project', subsection=self.name, text=f'wrote ifc map to {ifc_map}')
             return ifc_map
         else:
-            cts_print(section='project', subsection=self.name, text=f'skipping ifc map')
+            cts_print(section='project', subsection=self.name, text=f'ifc map :: {cts_underline("no changes since last build")}')
             return None
         
     def resolve_modified_dependencies(self, modified_files: list[PathLike]) -> list[PathLike]:
@@ -443,9 +443,12 @@ class MsvcTarget(Target):
     def build_static_library(self):
         self._Await_deferred_commands()
 
-        if self.object_files and path_exists(self.static_library_path) and not self._rebuilt_files:
-            cts_print(section='project', subsection=self.name, text=f'static library :: no changes since last build')
+        if not self._should_relink and self.object_files and path_exists(self.static_library_path) and not self._rebuilt_files:
+            cts_print(section='project', subsection=self.name, text=f'static library :: {cts_underline("no changes since last build")}')
             return
+
+        if self._should_relink:
+            cts_print(section='project', subsection=self.name, text=f'static library :: dependencies were updated, relinking')
 
         args = self._Basic_lib_flags()
         
@@ -462,9 +465,12 @@ class MsvcTarget(Target):
             cts_print(section='project', subsection=self.name, text=f'executable :: no main translation unit')
             return
         
-        if path_exists(self.executable_path) and not self._rebuilt_files:
-            cts_print(section='project', subsection=self.name, text=f'executable :: no changes since last build')
+        if not self._should_relink and path_exists(self.executable_path) and not self._rebuilt_files:
+            cts_print(section='project', subsection=self.name, text=f'executable :: {cts_underline("no changes since last build")}')
             return
+        
+        if self._should_relink:
+            cts_print(section='project', subsection=self.name, text=f'executable :: dependencies were updated, relinking')
         
         args = self._Basic_exe_flags()
         

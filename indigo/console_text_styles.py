@@ -121,7 +121,7 @@ def cts_print_config_category(category: str):
     print(f'  [{cts_warning(category)}]')
 
 def cts_print_config_pair(key: str, value: str):
-    print(f"    {cts_okgreen(key):<30}= '{value}'")
+    print(f"  - {cts_okcyan(key):<30} :: '{value}'")
 
 
 __all__ = [

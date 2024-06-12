@@ -69,8 +69,8 @@ def import_dataclass(path: fs.PathLike, property: str, class_type: type = None):
         cts_print(
             section = 'import',
             subsection = import_type,
-            subsection_style = cts_pass,
-            text = f'{cts_okcyan(module_name)} from file \'{rel_path}\''
+            subsection_style = cts_warning,
+            text = f'{cts_okcyan(module_name)} from file \'{cts_warning(rel_path)}\''
         )
         spec = spec_from_file_location(module_name, path, submodule_search_locations=[fs.current_directory()])
         assert spec
